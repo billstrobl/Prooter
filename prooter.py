@@ -22,27 +22,30 @@ import click
 from lxml import html
 import pprint as pp
 
-PATH = (str(os.path.dirname(os.path.realpath(__file__))) + '/data/')
-OUTPUT_PATH = (str(os.path.dirname(os.path.realpath(__file__))) + '/results/')
+SOURCE_PATH = os.path.join(str(os.path.dirname(os.path.realpath(__file__))), 'data')
+OUTPUT_PATH = os.path.join(str(os.path.dirname(os.path.realpath(__file__))), 'results')
 
 
-def get_file_list():
+def get_file_list(base_source_path):
     this_file_list = []
-    for _, _, files in os.walk(PATH):
+    for _, _, files in os.walk(base_source_path):
         for file in files:
+            file_name = str(file)
+            if file_name == '.dummyfile':
+                continue
             this_file_list.append(str(file))
             logging.debug('\nAdded {} to scan list.'.format(str(file)))
     logging.debug('\nFile list complete!')
     return this_file_list
 
 
-def check_files(list_to_check, run_type):
+def check_files(base_source_path, list_to_check, run_type):
     logging.debug('\nStarting file scan . . .')
     results_list = []
 
-    for this_filename in list_to_check:
-        logging.debug("\nChecking {} . . .\n".format(this_filename))
-        with open(str(PATH) + this_filename, encoding="utf8") as this_file:
+    for source_file in list_to_check:
+        logging.debug("\nChecking {} . . .\n".format(source_file))
+        with open(os.path.join(base_source_path, source_file), encoding="utf8") as this_file:
             data = this_file.read()
             build_result_struct(data, results_list, run_type)
 
@@ -83,17 +86,19 @@ def build_result_struct(data, results_list, run_type):
 
 def get_output_filename(run_type):
     if run_type == 'users':
-        this_filename = 'users_result'
+        output_filename = 'users_result'
     elif run_type == 'posts':
-        this_filename = 'posts_result'
+        output_filename = 'posts_result'
     else:
-        this_filename = 'results'
-    return this_filename
+        output_filename = 'results'
+    return output_filename
 
 
-def output_results(this_result, filename, output_type):
-    logging.info('\nSaving results to {}'.format(OUTPUT_PATH+filename+'.'+output_type))
-    with open(str(OUTPUT_PATH) + filename + '.' + output_type, 'w+', encoding="utf8") as this_output:
+def output_results(base_output_path, this_result, filename, output_type):
+    output_filename = filename + '.' + output_type
+    output_path = os.path.join(base_output_path, output_filename)
+    logging.info('\nSaving results to {}'.format(output_path))
+    with open(output_path, 'w+', encoding="utf8") as this_output:
         if output_type == 'txt':
             this_output.write(str(this_result))
         elif output_type == 'csv':
@@ -104,16 +109,21 @@ def output_results(this_result, filename, output_type):
 
 
 @click.command()
-@click.option('-r', '--run_type', default="users", prompt="What data would you like? users, posts, or all", help="Determines data to parse. Valid values: users, posts, all.")
-@click.option('-f', '--file_format', default="txt", prompt="Desired output format? txt or csv", help="Output file extension. Valid values: txt, csv")
+@click.option('-r', '--run_type', default="users", prompt="What data would you like? users, posts, or all",
+              help="Determines data to parse. Valid values: users, posts, all.")
+@click.option('-f', '--file_format', default="txt", prompt="Desired output format? txt or csv",
+              help="Output file extension. Valid values: txt, csv")
 def run(run_type, file_format):
     logging.basicConfig(format="%(asctime)s: %(message)s", level=logging.INFO, datefmt="%H:%M:%S")
-    file_list = get_file_list()
+    file_list = get_file_list(SOURCE_PATH)
     if run_type == 'all':
-        output_results(check_files(file_list, 'users'), get_output_filename('users'), file_format)
-        output_results(check_files(file_list, 'posts'), get_output_filename('posts'), file_format)
+        output_results(OUTPUT_PATH, check_files(SOURCE_PATH, file_list, 'users'), get_output_filename('users'),
+                       file_format)
+        output_results(OUTPUT_PATH, check_files(SOURCE_PATH, file_list, 'posts'), get_output_filename('posts'),
+                       file_format)
     else:
-        output_results(check_files(file_list, run_type), get_output_filename(run_type), file_format)
+        output_results(OUTPUT_PATH, check_files(SOURCE_PATH, file_list, run_type), get_output_filename(run_type),
+                       file_format)
 
 
 if __name__ == '__main__':
