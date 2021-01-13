@@ -5,13 +5,20 @@
 #
 # Searches through HTML posts to find names, usernames, and posts. Creates an output that can be used elsewhere.
 #
-# Notes: This script relies on having the data locally available.
-# Future versions may include allowing remote source urls.
-# Specify the correct path to your data in the path var on line 17.
+# This function takes two arguments from the command line. run_type and file_format.
+# run_type is 'users', 'posts', or 'all' and controls what data will be parsed out from the HTML files.
+# file_format sets the file extension and processing needed to correctly create that kind of file. '.txt' or '.csv'
+#
+# Notes: This script relies on having the data locally available. Future versions may include allowing remote sources.
+# Specify the correct path to your data in the path var on line 22.
+# The path for the output files is also specified on line 23.
 ########################################################################################################################
 
 import os
 import re
+import csv
+import logging
+import click
 from lxml import html
 import pprint as pp
 
@@ -21,29 +28,32 @@ OUTPUT_PATH = (str(os.path.dirname(os.path.realpath(__file__))) + '/results/')
 
 def get_file_list():
     this_file_list = []
-    for root, dirs, files in os.walk(PATH):
+    for _, _, files in os.walk(PATH):
         for file in files:
             this_file_list.append(str(file))
-            #print('\nAdded {} to scan list.'.format(str(file)))
-    #print('\nFile list complete!')
+            logging.debug('\nAdded {} to scan list.'.format(str(file)))
+    logging.debug('\nFile list complete!')
     return this_file_list
 
 
 def check_files(list_to_check, run_type):
-    #print('\nStarting file scan . . .')
+    logging.debug('\nStarting file scan . . .')
     results_list = []
 
     for this_filename in list_to_check:
-        #print("\nChecking {} . . .\n".format(this_filename))
+        logging.debug("\nChecking {} . . .\n".format(this_filename))
         with open(str(PATH) + this_filename, encoding="utf8") as this_file:
             data = this_file.read()
             build_result_struct(data, results_list, run_type)
 
-    #print("######################################\n")
-    #print("      !! SCANNING COMPLETE !!         \n")
-    #print("######################################\n")
-    pp.pprint(results_list)
-    #print("\n######################################\n")
+    if run_type == 'users':
+        results_list = sorted(results_list, key=lambda k: k['name'])
+
+    logging.debug("######################################\n")
+    logging.debug("      !! SCANNING COMPLETE !!         \n")
+    logging.debug("######################################\n")
+    logging.info(pp.pprint(results_list))
+    logging.debug("\n######################################\n")
     return results_list
 
 
@@ -73,21 +83,38 @@ def build_result_struct(data, results_list, run_type):
 
 def get_output_filename(run_type):
     if run_type == 'users':
-        this_filename = 'users_result.txt'
+        this_filename = 'users_result'
     elif run_type == 'posts':
-        this_filename = 'posts_result.txt'
+        this_filename = 'posts_result'
     else:
-        this_filename = 'results.txt'
+        this_filename = 'results'
     return this_filename
 
 
-def output_results(this_result, filename):
-    print('\nSaving results to {}'.format(OUTPUT_PATH+filename))
-    with open(str(OUTPUT_PATH)+filename, 'w+', encoding="utf8") as this_output:
-        this_output.write(str(this_result))
+def output_results(this_result, filename, output_type):
+    logging.info('\nSaving results to {}'.format(OUTPUT_PATH+filename+'.'+output_type))
+    with open(str(OUTPUT_PATH) + filename + '.' + output_type, 'w+', encoding="utf8") as this_output:
+        if output_type == 'txt':
+            this_output.write(str(this_result))
+        elif output_type == 'csv':
+            keys = this_result[0].keys()
+            dict_writer = csv.DictWriter(this_output, keys)
+            dict_writer.writeheader()
+            dict_writer.writerows(this_result)
+
+
+@click.command()
+@click.option('-r', '--run_type', default="users", prompt="What data would you like? users, posts, or all", help="Determines data to parse. Valid values: users, posts, all.")
+@click.option('-f', '--file_format', default="txt", prompt="Desired output format? txt or csv", help="Output file extension. Valid values: txt, csv")
+def run(run_type, file_format):
+    logging.basicConfig(format="%(asctime)s: %(message)s", level=logging.INFO, datefmt="%H:%M:%S")
+    file_list = get_file_list()
+    if run_type == 'all':
+        output_results(check_files(file_list, 'users'), get_output_filename('users'), file_format)
+        output_results(check_files(file_list, 'posts'), get_output_filename('posts'), file_format)
+    else:
+        output_results(check_files(file_list, run_type), get_output_filename(run_type), file_format)
 
 
 if __name__ == '__main__':
-    file_list = get_file_list()
-    output_results(check_files(file_list, 'users'), get_output_filename('users'))
-    output_results(check_files(file_list, 'posts'), get_output_filename('posts'))
+    run()
