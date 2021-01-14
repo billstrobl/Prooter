@@ -10,8 +10,8 @@
 # file_format sets the file extension and processing needed to correctly create that kind of file. '.txt' or '.csv'
 #
 # Notes: This script relies on having the data locally available. Future versions may include allowing remote sources.
-# Specify the correct path to your data in the path var on line 22.
-# The path for the output files is also specified on line 23.
+# Specify the correct path to your data in the path var on line 25.
+# The path for the output files is also specified on line 26.
 ########################################################################################################################
 
 import os
@@ -30,8 +30,7 @@ def get_file_list(base_source_path):
     this_file_list = []
     for _, _, files in os.walk(base_source_path):
         for file in files:
-            file_name = str(file)
-            if file_name == '.dummyfile':
+            if str(file) == '.dummyfile':
                 continue
             this_file_list.append(str(file))
             logging.debug('\nAdded {} to scan list.'.format(str(file)))
@@ -55,7 +54,7 @@ def check_files(base_source_path, list_to_check, run_type):
     logging.debug("######################################\n")
     logging.debug("      !! SCANNING COMPLETE !!         \n")
     logging.debug("######################################\n")
-    logging.info(pp.pprint(results_list))
+    logging.debug(pp.pprint(results_list))
     logging.debug("\n######################################\n")
     return results_list
 
@@ -102,10 +101,13 @@ def output_results(base_output_path, this_result, filename, output_type):
         if output_type == 'txt':
             this_output.write(str(this_result))
         elif output_type == 'csv':
-            keys = this_result[0].keys()
-            dict_writer = csv.DictWriter(this_output, keys)
-            dict_writer.writeheader()
-            dict_writer.writerows(this_result)
+            try:
+                keys = this_result[0].keys()
+                dict_writer = csv.DictWriter(this_output, keys)
+                dict_writer.writeheader()
+                dict_writer.writerows(this_result)
+            except IndexError:
+                logging.info('No results found. Nothing to output to CSV.')
 
 
 @click.command()
